@@ -8,6 +8,7 @@ from utils import (
 )
 from logic import extend
 
+import numpy as np 
 import random
 from collections import defaultdict
 from functools import reduce
@@ -468,7 +469,8 @@ def likelihood_weighting(X, e, bn, N):
     """
     W = {x: 0 for x in bn.variable_values(X)}
     for j in range(N):
-        sample, weight = weighted_sample(bn, e)  # boldface x, w in [Figure 14.15]
+        # boldface x, w in [Figure 14.15]
+        sample, weight = weighted_sample(bn, e)
         W[sample[X]] += weight
     return ProbDist(X, W)
 
@@ -505,6 +507,37 @@ def gibbs_ask(X, e, bn, N):
     return ProbDist(X, counts)
 
 
+def metropolis_hastings(X, e, bn, N):
+
+    assert X not in e, "Query variable must be distinct from evidence"
+    counts = {x: 0 for x in bn.variable_values(X)}  # bold N in [Figure 14.16]
+    Z = [var for var in bn.variables if var not in e]
+    state = dict(e)  # boldface x in [Figure 14.16]
+    new_state = dict()
+
+    # State normal distribution
+    for Zi in Z:
+        state[Zi] = random.choice(bn.variable_values(Zi))
+        counts[state[X]] += 1
+
+    current = ProbDist(X, counts)
+
+    for j in range(N):
+        for Zj in Z:
+            # computes P(X|)
+            new_state[Zj] = markov_blanket_sample(Zi, state, bn)
+            counts[new_state[X]] += 1
+
+        proposal = ProbDist(X, counts)
+        accept_prob = min(proposal/current, 1)
+
+        if np.random.rand() < accept_prob:
+            state = new_state
+            current = proposal
+
+    return current
+
+
 def markov_blanket_sample(X, e, bn):
     """Return a sample from P(X | mb) where mb denotes that the
     variables in the Markov blanket of X take their values from event
@@ -519,6 +552,7 @@ def markov_blanket_sample(X, e, bn):
                                          for Yj in Xnode.children)
     # (assuming a Boolean variable here)
     return probability(Q.normalize()[True])
+    # return probability(Q[True])
 
 # _________________________________________________________________________
 
@@ -599,7 +633,8 @@ def fixed_lag_smoothing(e_t, HMM, d, ev, t):
     if t > d:
         f = forward(HMM, f, e_t)
         O_tmd = vector_to_diagonal(HMM.sensor_dist(ev[t - d]))
-        B = matrix_multiplication(inverse_matrix(O_tmd), inverse_matrix(T_model), B, T_model, O_t)
+        B = matrix_multiplication(inverse_matrix(
+            O_tmd), inverse_matrix(T_model), B, T_model, O_t)
     else:
         B = matrix_multiplication(B, T_model, O_t)
     t += 1
@@ -651,17 +686,20 @@ def particle_filtering(e, N, HMM):
     return s
 
 # _________________________________________________________________________
-## TODO: Implement continous map for MonteCarlo similar to Fig25.10 from the book
+# TODO: Implement continous map for MonteCarlo similar to Fig25.10 from the book
+
 
 class MCLmap:
     """Map which provides probability distributions and sensor readings.
     Consists of discrete cells which are either an obstacle or empty"""
+
     def __init__(self, m):
         self.m = m
         self.nrows = len(m)
         self.ncols = len(m[0])
         # list of empty spaces in the map
-        self.empty = [(i, j) for i in range(self.nrows) for j in range(self.ncols) if not m[i][j]]
+        self.empty = [(i, j) for i in range(self.nrows)
+                      for j in range(self.ncols) if not m[i][j]]
 
     def sample(self):
         """Returns a random kinematic state possible in the map"""
@@ -679,7 +717,8 @@ class MCLmap:
         #  0
         # 3R1
         #  2
-        delta = ((sensor_num%2 == 0)*(sensor_num - 1), (sensor_num%2 == 1)*(2 - sensor_num))
+        delta = ((sensor_num % 2 == 0)*(sensor_num - 1),
+                 (sensor_num % 2 == 1)*(2 - sensor_num))
         # sensor direction changes based on orientation
         for _ in range(orient):
             delta = (delta[1], -delta[0])
