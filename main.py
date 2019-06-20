@@ -3,6 +3,7 @@ from prettytable import PrettyTable
 import numpy as np
 import random
 
+
 def prior(X, e, bn, N):
 
     all_observations = [prior_sample(bn) for x in range(N)]
@@ -47,8 +48,6 @@ def prior_double(X, e1, e2, bn, N):
 
 if __name__ == "__main__":
 
-    T, F = True, False
-
     """
     Exercício 14.21
 
@@ -71,22 +70,35 @@ if __name__ == "__main__":
     
     X.win:
 
-    T,F: Venceu o 1o jogo e perdeu o 2o
-    F,T: Perdeu o 1o jogo e venceu o 2o jogo
-    T,T: Venceu os dois jogos
-    F,F: Perdeu os dois jogos
+    T,F: Fez gols no 1o jogo e nada no 2o
+    F,T: Nenhum gol no 1o jogo e fez gols no 2o jogo
+    T,T: Fez gols em ambos os jogos
+    F,F: Nenhum gol em ambas as partidas
     
     """
 
     """ Repostas:
 
     a) As classes são Team, com instâncias A, B e C, e Match, com instâncias AB,
-    BC e CA. Cada equipe tem uma qualidade Q e cada partida tem um Team1 e Team2. 
-    Os nomes das equipes para cada partida são, é claro, fixados antecipadamente. O prior
-    sobre a qualidade pode ser uniforme e a probabilidade de uma vitória para a equipe 1 deve aumentar
-    com Q (Team1) - Q (Team2).
+    BC e CA. Cada equipe tem uma qualidade Q e cada partida tem um time X e e um time Y. 
+    Os nomes das equipes para cada partida são, é claro, fixados antecipadamente. A priori
+    sobre a qualidade dos timespode ser uniforme e a probabilidade de uma vitória para a 
+    equipe 1 deve aumentar com Q (Team1) - Q (Team2).
 
-     """
+    b) Priori: A, B, C
+    Pais(AB.resultado) = A, B
+    Pais(BC.resultado) = B, C
+    Pais(CA.resultado) = C, A
+
+    c) Codigo abaixo
+    d) O custo de inferência em tal modelo será O (2n) devido a quantidade de pais do resultado
+    e) O MCMC parece se dar bem com esse problema, desde que as probabilidades não sejam muito
+    enviesadas. Os resultados mostram um comportamento aparentemente linear no número de
+    equipes, embora não tenha investigado para um n grande.
+    
+    """
+    T, F = True, False
+
     quality = np.arange(4)
     normed = [i/sum(quality) for i in quality]
     q4, q3, q2, q1 = normed
@@ -101,19 +113,22 @@ if __name__ == "__main__":
                                  (T, F): 0.4, (F, T): 0.1, (F, F): 0.2}),
         ('CA.resultado', 'C A', {(T, T): 0.3,
                                  (T, F): 0.2, (F, T): 0.5, (F, F): 0.3}),
-        ('A.win', 'AB.resultado CA.resultado', {(T, T): 0.6,
+        ('Awin', 'AB.resultado CA.resultado', {(T, T): 0.6,
                                                 (T, F): 0.3, (F, T): 0.3, (F, F): 0.1}),
-        ('B.win', 'AB.resultado BC.resultado', {(T, T): 0.4,
+        ('Bwin', 'AB.resultado BC.resultado', {(T, T): 0.4,
                                                 (T, F): 0.3, (F, T): 0.3, (F, F): 0.2}),
-        ('C.win', 'CA.resultado BC.resultado', {(T, T): 0.2,
+        ('Cwin', 'CA.resultado BC.resultado', {(T, T): 0.2,
                                                 (T, F): 0.3, (F, T): 0.3, (F, F): 0.6}),
     ])
 
-    ans = enumeration_ask('BC.resultado', {'A.win': T, 'B.win': F}, team_matches).show_approx()
 
-    """ A probabilidade de B vencer o jogo com dada a evidencia que A ganhou o 
-    primeiro jogo com B e empatou com C = 'False: 0.759, True: 0.241', 
-    ou seja, B tem maior probabilidade de perder dado os jogos anteriores"""
+    ans = enumeration_ask(
+        'BC.resultado', {'Awin': T, 'Bwin': F, 'Cwin': T}, team_matches).show_approx()
+    ans1 = gibbs_ask('BC.resultado', dict(Awin=T, Bwin=F, Cwin=T), team_matches, 1000).show_approx()
+
+    """ Item (c) e (e) A probabilidade de B vencer o jogo com dada a evidencia que A ganhou o 
+    primeiro jogo com B e empatou com C = 'False: 0.783, True: 0.217' para enumeration_ask e 
+    'False: 0.777, True: 0.223' para gibbs_ask, ou seja, B tem maior probabilidade de perder dado os jogos anteriores """
 
     """ Exercício 14.20: 
     
